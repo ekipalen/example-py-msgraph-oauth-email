@@ -2,10 +2,8 @@
 # https://github.com/robocorp/rcc/blob/master/docs/recipes.md#what-is-in-robotyaml
 
 tasks:
-  Init Microsoft OAuth:
+  Initial Microsoft OAuth flow:
     shell: python -m robocorp.tasks run -t initial_msgraph_authentication
-  Get Latest Email:
-    shell: python -m robocorp.tasks run -t get_latest_email
   Send Test Email:
     shell: python -m robocorp.tasks run -t send_email
 

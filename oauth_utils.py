@@ -1,20 +1,44 @@
-import os
 from urllib.parse import parse_qs, urlparse
 
-from dotenv import load_dotenv
 from msal import ConfidentialClientApplication
 from robocorp import browser, log, vault
 
-load_dotenv(".env")
-SECRET_NAME = os.getenv("SECRET_NAME")
-SCOPES = os.getenv("SCOPES").split(",")
-MAIL_SECRETS = vault.get_secret(SECRET_NAME)
+from variables import SCOPES, SECRET_NAME
 
-TENANT_ID = MAIL_SECRETS["tenant_id"]
-CLIENT_ID = MAIL_SECRETS["client_id"]
-CLIENT_SECRET = MAIL_SECRETS["client_secret"]
-ACCESS_TOKEN = MAIL_SECRETS["access_token"]
-REFRESH_TOKEN = MAIL_SECRETS["refresh_token"]
+MAIL_SECRETS = vault.get_secret(SECRET_NAME)
+SCOPES = SCOPES.split(",")
+MANDATORY_KEYS = ["tenant_id", "client_id", "client_secret"]
+
+
+def check_mail_secrets(secrets: dict, mandatory_keys: list) -> None:
+    """
+    Checks for the presence of mandatory keys in the Control Room Vault.
+
+    Args:
+        secrets (dict): The dictionary containing the secrets.
+        mandatory_keys (list): A list of keys that must be present in the secrets dictionary.
+
+    Raises:
+        KeyError: If any of the mandatory keys are missing from the secrets dictionary.
+    """
+    missing_keys = [key for key in mandatory_keys if key not in secrets]
+    if missing_keys:
+        raise KeyError(
+            f"Missing mandatory keys in MAIL_SECRETS (Control Room Vault): {missing_keys}"
+        )
+
+
+try:
+    check_mail_secrets(MAIL_SECRETS, MANDATORY_KEYS)
+
+    TENANT_ID = MAIL_SECRETS["tenant_id"]
+    CLIENT_ID = MAIL_SECRETS["client_id"]
+    CLIENT_SECRET = MAIL_SECRETS["client_secret"]
+    ACCESS_TOKEN = MAIL_SECRETS.get("access_token")
+    REFRESH_TOKEN = MAIL_SECRETS.get("refresh_token")
+
+except KeyError as e:
+    print(f"Configuration error: {e}")
 
 app = ConfidentialClientApplication(
     CLIENT_ID,
@@ -24,7 +48,7 @@ app = ConfidentialClientApplication(
 
 
 @log.suppress
-def get_auth_code_using_browser(auth_url):
+def get_auth_code_using_browser(auth_url: str) -> str:
     """
     Retrieves the authorization code from the given authentication URL using a browser.
 
@@ -96,7 +120,7 @@ def refresh_microsoft_token(refresh_token) -> dict:
 
 
 @log.suppress
-def build_headers(token):
+def build_headers(token: str) -> dict:
     """
     Builds the authorization headers for API requests.
 
@@ -119,7 +143,7 @@ def build_headers(token):
 
 
 @log.suppress
-def update_vault(access_token, refresh_token):
+def update_vault(access_token: str, refresh_token: str) -> None:
     """
     Updates the vault with new access and refresh tokens.
 
