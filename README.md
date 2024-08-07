@@ -1,60 +1,86 @@
-# Template: Python - Minimal
+# MSGraph authorization with OAuth2 flow
 
-This template leverages the new [Python framework](https://github.com/robocorp/robocorp), the [libraries](https://github.com/robocorp/robocorp/blob/master/docs/README.md#python-libraries) from to same project as well.
+In this example, you will learn how to send emails using Microsoft Outlook Online using MSGraph. The
+sending is the easy part, but now we do an authorization which relies on tokens. And that's usually done through the OAuth2.
+[Authorization Code Grant](https://oauth.net/2/grant-types/authorization-code/) flow.
 
-The template provides you with the basic structure of a Python project: logging out of the box and controlling your tasks without fiddling with the base Python stuff. The environment contains the most used libraries, so you do not have to start thinking about those right away. 
 
-👉 Other templates are available as well via our tooling and on our [Portal](https://robocorp.com/portal/tag/template)
+## Tasks
 
-## Running
+Before sending an e-mail with `Send Test Email`, you have to create the access and refresh tokens which are stored to the Control Room Vault by running `Init Microsoft OAuth` task first. This initializer step is required once, then you can send as many e-mails as you want with the tokens already configured.
 
-#### VS Code
-1. Get [Robocorp Code](https://robocorp.com/docs/developer-tools/visual-studio-code/extension-features) -extension for VS Code.
-1. You'll get an easy-to-use side panel and powerful command-palette commands for running, debugging, code completion, docs, etc.
+### Microsoft Entra OAuth/Email tasks
 
-#### Command line
+1. `Init Microsoft OAuth`: Authenticate user, authorize app and have the tokens
+   generated automatically in the Vault.
+2. `Send Test Email`: Send an email using MSGraph.
 
-1. [Get RCC](https://github.com/robocorp/rcc?tab=readme-ov-file#getting-started)
-1. Use the command: `rcc run`
+## Client app setup
 
-## Results
+You need to register an app which will act on behalf of your account. The app
+(Client) is the entity sending e-mails instead of you (User). But you need to
+authenticate yourself and authorize the app first in order to allow it to send
+e-mails for you. For this, certain settings are required:
 
-🚀 After running the bot, check out the `log.html` under the `output` -folder.
+### Microsoft Entra app registration
 
-## Dependencies
+1. Go to Microsoft Entra (formerly Azure Active Directory) *[App registrations](https://entra.microsoft.com/#view/Microsoft_AAD_RegisteredApps)*
+   page and follow [these](https://learn.microsoft.com/en-us/azure/active-directory/develop/quickstart-register-app)
+   app configuration instructions.
+3. Ensure you created a "Web" app and have the following checked:
+   - Is a *private* **single** or **multi-tenant** app.
+   - The type of the application is **Web App**.
+   - Redirect URI can be: `https://login.microsoftonline.com/common/oauth2/nativeclient`
+   - Has at least the following **MSGraph** permission(s) enabled:
+     - **Delegated**: `Mail.Send` (MSGraph -> Mail)
 
-We strongly recommend getting familiar with adding your dependencies in [conda.yaml](conda.yaml) to control your Python dependencies and the whole Python environment for your automation.
+   - Create a client secret and take note of these credentials (client ID, client secret & tenant ID), as you need
+     them later on.
 
-<details>
-  <summary>🙋‍♂️ "Why not just pip install...?"</summary>
 
-Think of [conda.yaml](conda.yaml) as an equivalent of the requirements.txt, but much better. 👩‍💻 With `conda.yaml`, you are not just controlling your PyPI dependencies; you control the complete Python environment, which makes things repeatable and easy.
+## Variables setup
 
-👉 You will probably need to run your code on another machine quite soon, so by using `conda.yaml`:
-- You can avoid `Works on my machine` -cases
-- You do not need to manage Python installations on all the machines
-- You can control exactly which version of Python your automation will run on 
-  - You'll also control the pip version to avoid dep. resolution changes
-- No need for venv, pyenv, ... tooling and knowledge sharing inside your team.
-- Define dependencies in conda.yaml, let our tooling do the heavy lifting.
-- You get all the content of [conda-forge](https://prefix.dev/channels/conda-forge) without any extra tooling
+To use secrets from the Vault and send email you need to set certain variables. You can set them up by modifying `variables.py` file in project root. Set the `SECRET_NAME` variable to match your Control Room Vault `name`. Set also a working email addresse(s) to the `RECIPIENT` variable, separated by comma if more than one. 
 
-> Dive deeper with [these](https://github.com/robocorp/rcc/blob/master/docs/recipes.md#what-is-in-condayaml) resources.
+## Vault setup
 
-</details>
-<br/>
+The client ID, client secret and tenant ID obtained from Entra needs to be stored securely in the Vault,
+as they'll be used automatically by the automation in order to obtain the tokens. The
+token entries in Vault will be created during the authentication flow and will be refreshed automatically later on by the automation. 
 
-> The full power of [rpaframework](https://robocorp.com/docs/python/rpa-framework) -libraries is also available on Python as a backup while we implement the new Python libraries.
+### Online Control Room Vault
 
-## What now?
+Create a secret called e.g. `MSGraph` in Control Room's Vault with the
+following entries (and make sure to connect **VSCode** to the online Vault):
 
-🚀 Now, go get'em
+- `tenant_id`: Your Microsoft Entra tenant ID.
+- `client_id`: Your application/client ID.
+- `client_secret`: Your app client secret.
+- `access_token`: Optional, you can create this entry and leave it blank since this will be overridden by the task. 
+- `refresh_token`: Optional, You can create this entry and leave it blank since this will be overridden by the task. 
 
-Start writing Python and remember that the AI/LLM's out there are getting really good and creating Python code specifically.
+## Task run
 
-👉 Try out [Robocorp ReMark 💬](https://chat.robocorp.com)
+Run with **VSCode** or **rcc** the following tasks in order:
 
-For more information, do not forget to check out the following:
-- [Robocorp Documentation -site](https://robocorp.com/docs)
-- [Portal for more examples](https://robocorp.com/portal)
-- Follow our main [robocorp -repository](https://github.com/robocorp/robocorp) as it is the main location where we developed the libraries and the framework.
+1. `Init Microsoft OAuth`: Opens a browser window for you to authenticate and
+   finally getting a redirect response URL in the address bar. Once you get there, the
+   browser closes and the token gets generated and updated in the Vault.
+   - Now you should see your brand new `access_token` and `refresh_token` fields created/updated in the Vault.
+     (keep it private as this is like a password which grants access into your e-mail)
+   - This step is required to be run once, requires human intervention (attended) and
+     once you get your token generated, it will stay valid (by refreshing itself)
+     indefinitely.
+2. `Send Test Email`: Sends a test e-mail to the recipient(s) listed in the `variables.py` given the credentials
+   configured in the Vault during the previous step.
+   - This step can be fully automated and doesn't require the first step run each time.
+     As once the tokens are set, it remains available until you revoke the refresh
+     token or remove the app.
+
+## Remarks
+
+- Access token lifetime:
+  - While using this example the token refreshes itself automatically (internally handled by
+    the libraries) and is automatically updated into the Vault as well.
+- Learn more about OAuth2:
+  - [Microsoft](https://docs.microsoft.com/en-us/azure/active-directory/develop/v2-oauth2-auth-code-flow)
